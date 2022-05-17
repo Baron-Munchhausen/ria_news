@@ -10,7 +10,8 @@ wks = sheets.worksheet_by_title('Лист1')
 last_datetime = datetime.datetime.strptime(wks.get_value('D1'), '%H:%M %d.%m.%Y')
 
 if __name__ == '__main__':
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.3'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) '
+                             'Chrome/41.0.2228.0 Safari/537.3'}
 
     ria = 'https://ria.ru/services/economy/more.html?date='
     not_end = True
@@ -45,7 +46,7 @@ if __name__ == '__main__':
         current_datetime = createdAt_datetime.strftime('%Y%m%dT%H%M59')
         # not_end = False
 
-    articles = {v['url']:v for v in articles}.values()
+    articles = {v['url']: v for v in articles}.values()
     articles = sorted(articles, key=lambda d: d['createdAt'])
 
     for article in articles:
