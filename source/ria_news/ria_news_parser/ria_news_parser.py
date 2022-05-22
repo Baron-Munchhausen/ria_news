@@ -4,6 +4,22 @@ from bs4 import BeautifulSoup
 # https://github.com/nithinmurali/pygsheets
 import pygsheets
 import configparser
+import requests_html
+import asyncio
+from requests_html import HTMLSession
+
+# create an HTML Session object
+session = HTMLSession()
+
+# Use the object above to connect to needed webpage
+resp = session.get("https://ria.ru/20220522/platezhi-1789972703.html", timeout=8000)
+
+# Run JavaScript code on webpage
+resp.html.render()
+
+print(resp.html.search('stat'))
+
+exit()
 
 # config
 config = configparser.ConfigParser()
