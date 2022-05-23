@@ -8,18 +8,28 @@ import requests_html
 import asyncio
 from requests_html import HTMLSession
 
-# create an HTML Session object
-session = HTMLSession()
+def get_article_statistics(url):
+   
+    session = HTMLSession()
 
-# Use the object above to connect to needed webpage
-resp = session.get("https://ria.ru/20220522/platezhi-1789972703.html", timeout=8000)
+    attempt = 0
 
-# Run JavaScript code on webpage
-resp.html.render()
+    while attempt < 3:
+        response = session.get(url, timeout=10000)
+        response.html.render()
+        soup = BeautifulSoup(response.html.html, 'lxml')
+        result = soup.find_all('div', attrs = {'class':'article__info-statistic'})
+        if len(result[0].text) > 0:
+            try:
+                article_views = int(result[0].text)
+                session.close()
+                return article_views
+            except:
+                continue
+        attempt += 1
 
-print(resp.html.search('stat'))
-
-exit()
+    session.close()
+    return 0
 
 # config
 config = configparser.ConfigParser()
@@ -43,12 +53,30 @@ last_url = wks.get_value('B1')
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) '
                          'Chrome/41.0.2228.0 Safari/537.3'}
 
+
+# Update statistic
+n = 0
+while True:
+    n += 1
+    url = wks.get_value('B' + str(n))
+    if len(url) == 0:
+        break
+    createdAt = datetime.datetime.strptime(wks.get_value('D' + str(n)), '%H:%M %d.%m.%Y')
+    if (datetime.datetime.now() - createdAt).seconds > 1200:
+        break
+    
+    article_statistics = get_article_statistics(url)
+    if article_statistics > 0:
+        statistics_cell = wks.update_value(('E' + str(n)),article_statistics)
+    
+    print(str(n) + ' ' + url + ' ' + str(article_statistics))
+
+
 ria = 'https://ria.ru/services/economy/more.html?date='
 ria = 'https://ria.ru/services/search/getmore/?query=&offset='
 offset = 0
 not_end = True
 current_datetime = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
-#current_datetime = datetime.datetime(2022,5,12,9,0).strftime('%Y%m%dT%H%M%S')
 
 articles = []
 
@@ -61,8 +89,9 @@ while not_end:
     soup = BeautifulSoup(req.text, 'lxml')
 
     for item in soup.find_all('div', attrs={'class': 'list-item'}):
-        url = item.find_all('a', attrs={'class': 'list-item__title color-font-hover-only'})[0].attrs['href']
         try:
+            url = item.find_all('a', attrs={'class': 'list-item__title color-font-hover-only'})[0].attrs['href']
+            article_statistics = get_article_statistics(url)
             req2 = requests.get(url, headers=headers)
             soup2 = BeautifulSoup(req2.text, 'lxml')
 
@@ -74,31 +103,23 @@ while not_end:
             author = str(soup2.find_all('meta', attrs={'name': 'analytics:author'})).replace('[<meta content="',
                                                                                          '').replace(
             '" name="analytics:author"/>]', '')
+            if createdAt_datetime >= last_datetime and url != last_url and createdAt_datetime <= datetime.datetime.now():
+                article = {'title': title, 'url': url, 'author': author, 'createdAt': createdAt, 'createdAt_datetime': createdAt_datetime, 'article_statistics': article_statistics}
+                print(article)
+                articles.append(article)
+            elif createdAt_datetime < last_datetime:
+                not_end = False
         except:
             error_wks.insert_rows(0, 1, [url])
 
-        if createdAt_datetime >= last_datetime and url != last_url and createdAt_datetime <= datetime.datetime.now():
-            article = {'title': title, 'url': url, 'author': author, 'createdAt': createdAt, 'createdAt_datetime': createdAt_datetime}
-            print(article)
-            articles.append(article)
-        elif createdAt_datetime < last_datetime:
-            not_end = False
+
 
     current_datetime = createdAt_datetime.strftime('%Y%m%dT%H%M59')
     offset += 20
-    # not_end = False
 
 
 articles_distinct = {v['url']: v for v in articles}.values()
 articles_sorted = sorted(articles_distinct, key=lambda d: d['createdAt_datetime'])
 
 for article in articles_sorted:
-    wks.insert_rows(0, 1, [article['title'], article['url'], article['author'], article['createdAt']])
-
-
-#x = name
-#        for attr in dir(x):
-#            if not attr.startswith('_'):  # Если не внутренний и не служебный
-#                print(attr)
-#                print(getattr(x, attr))
-#        print('------')
+    wks.insert_rows(0, 1, [article['title'], article['url'], article['author'], article['createdAt'], article['article_statistics']])
