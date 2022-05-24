@@ -6,27 +6,62 @@ import configparser
 from requests_html import HTMLSession
 
 
-def get_article_statistics(_url):
+class RiaArticle:
+    
+    def __init__(self, url):
 
-    session = HTMLSession()
+        self.url = url
 
-    attempt = 0
+    def get_statistics(self):
+        
+        session = HTMLSession()
 
-    while attempt < 3:
-        response = session.get(_url, timeout=10000)
-        response.html.render()
-        article_soup = BeautifulSoup(response.html.html, 'lxml')
-        result = article_soup.find_all('div', attrs={'class': 'article__info-statistic'})
-        if len(result[0].text) > 0:
-            session.close()
-            try:
-                article_views = int(result[0].text)
-                return article_views
-            except ValueError:
-                continue
-        attempt += 1
-    session.close()
-    return 0
+        attempt = 0
+
+        while attempt < 3:
+            response = session.get(self.url, timeout=10000)
+            # сделать зависимость таймаута от попытки
+            response.html.render(timeout=10)
+            article_soup = BeautifulSoup(response.html.html, 'lxml')
+            result = article_soup.find_all('div', attrs={'class': 'article__info-statistic'})
+            if len(result[0].text) > 0:
+                try:
+                    self.statistics = int(result[0].text)
+                    session.close()
+                    break
+                except ValueError:
+                    continue
+            attempt += 1
+        session.close()
+
+        if self.statistics == None:
+            self.statistics = -1
+
+    def get_info(self):
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) '
+                             'Chrome/41.0.2228.0 Safari/537.3'}
+
+        self.get_statistics()
+        req = requests.get(self.url, headers=headers)
+        soup = BeautifulSoup(req.text, 'lxml')
+
+        self.created_at = soup.find_all('div', attrs={'class': 'article__info-date'})[0].find_all('a')[0].next
+        self.created_at_datetime = datetime.datetime.strptime(self.created_at, '%H:%M %d.%m.%Y')
+
+        self.title = str(soup.find_all(['div', 'h1'], attrs={'class': 'article__title'})[0]
+                         ).replace('<div class="article__title">', ''
+                         ).replace('<h1 class="article__title">', ''
+                         ).replace('</div>', ''
+                         ).replace('</h1>', '')
+
+        self.author = str(soup.find_all('meta', attrs={'name': 'analytics:author'})
+                         ).replace('[<meta content="',''
+                         ).replace('" name="analytics:author"/>]', '')
+
+
+a = RiaArticle('https://ria.ru/20220524/sammit-1790441915.html')
+a.get_info()
+print(a.title + ' ' + str(a.statistics))
 
 
 def update_view_statistics(_wks, _period):
@@ -42,11 +77,13 @@ def update_view_statistics(_wks, _period):
         if (datetime.datetime.now() - created_at).seconds > _period:
             break
 
-        article_statistics = get_article_statistics(url)
-        if article_statistics > 0:
-            _wks.update_value(('E' + str(n)), article_statistics)
+        article = RiaArticle(url)
+        article.get_statistics()
+        
+        if article.statistics > 0:
+            _wks.update_value(('E' + str(n)), article.statistics)
 
-        print(str(n) + ' ' + url + ' ' + str(article_statistics))
+        print(str(n) + ' ' + url + ' ' + str(article.statistics))
 
 
 def download_new_articles(_wks, _error_wks):
@@ -58,7 +95,7 @@ def download_new_articles(_wks, _error_wks):
     while True:
         n += 1
         if datetime.datetime.strptime(wks.get_value('D' + str(n)), '%H:%M %d.%m.%Y') == last_datetime:
-            last_urls += wks.get_value('B' + str(n))
+            last_urls.append(wks.get_value('B' + str(n)))
         else:
             break
 
@@ -81,36 +118,24 @@ def download_new_articles(_wks, _error_wks):
         for item in soup.find_all('div', attrs={'class': 'list-item'}):
             url = item.find_all('a', attrs={'class': 'list-item__title color-font-hover-only'})[0].attrs['href']
             try:
-                article_statistics = get_article_statistics(url)
-                req2 = requests.get(url, headers=headers)
-                soup2 = BeautifulSoup(req2.text, 'lxml')
-
-                created_at = soup2.find_all('div', attrs={'class': 'article__info-date'})[0].find_all('a')[0].next
-                created_at_datetime = datetime.datetime.strptime(created_at, '%H:%M %d.%m.%Y')
-
-                title = str(soup2.find_all(['div', 'h1'], attrs={'class': 'article__title'})[0]).replace(
-                    '<div class="article__title">', '').replace('<h1 class="article__title">', '').replace('</div>', '')
-                author = str(soup2.find_all('meta', attrs={'name': 'analytics:author'})).replace('[<meta content="',
-                                                                                                 '').replace(
-                    '" name="analytics:author"/>]', '')
-                if last_datetime <= created_at_datetime <= datetime.datetime.now() and url not in last_urls:
-                    article = {'title': title, 'url': url, 'author': author, 'created_at': created_at,
-                               'createdAt_datetime': created_at_datetime, 'article_statistics': article_statistics}
-                    print(article)
+                article = RiaArticle(url)
+                article.get_info()
+                if last_datetime <= article.created_at_datetime <= datetime.datetime.now() and url not in last_urls:
+                    print(article.created_at + ' ' + article.title)
                     articles.append(article)
-                elif created_at_datetime < last_datetime:
+                elif article.created_at_datetime < last_datetime:
                     not_end = False
             except:
                 error_wks.insert_rows(0, 1, [url])
 
         offset += 20
 
-    articles_distinct = {v['url']: v for v in articles}.values()
-    articles_sorted = sorted(articles_distinct, key=lambda d: d['createdAt_datetime'])
+    articles_distinct = {v.url: v for v in articles}.values()
+    articles_sorted = sorted(articles_distinct, key=lambda d: d.created_at_datetime)
 
     for article in articles_sorted:
-        wks.insert_rows(0, 1, [article['title'], article['url'], article['author'], article['created_at'],
-                               article['article_statistics']])
+        wks.insert_rows(0, 1, [article.title, article.url, article.author, article.created_at,
+                               article.statistics])
 
 
 # config
@@ -128,7 +153,7 @@ wks = sheets.worksheet_by_title(config['google']['article_file_sheet'])
 error_sheets = client.open_by_url(config['google']['error_file'])
 error_wks = error_sheets.worksheet_by_title(config['google']['error_file_sheet'])
 
-# Update view statistic
+# Update view statistics
 update_view_statistics(wks, 2400)
 
 # Download new articles
