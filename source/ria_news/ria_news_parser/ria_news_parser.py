@@ -21,17 +21,20 @@ class RiaArticle:
         while attempt < 3:
             response = session.get(self.url, timeout=10000)
             # сделать зависимость таймаута от попытки
-            response.html.render(timeout=10)
-            article_soup = BeautifulSoup(response.html.html, 'lxml')
-            result = article_soup.find_all('div', attrs={'class': 'article__info-statistic'})
-            if len(result[0].text) > 0:
-                try:
-                    self.statistics = int(result[0].text)
-                    session.close()
-                    break
-                except ValueError:
-                    continue
-            attempt += 1
+            try:
+                timeout = 10 + 5 * attempt
+                response.html.render(timeout=timeout)
+                article_soup = BeautifulSoup(response.html.html, 'lxml')
+                result = article_soup.find_all('div', attrs={'class': 'article__info-statistic'})
+                if len(result[0].text) > 0:
+                    try:
+                        self.statistics = int(result[0].text)
+                        session.close()
+                        break
+                    except ValueError:
+                        continue
+            except:
+                attempt += 1
         session.close()
 
         if self.statistics == None:
@@ -148,8 +151,9 @@ wks = sheets.worksheet_by_title(config['google']['article_file_sheet'])
 error_sheets = client.open_by_url(config['google']['error_file'])
 error_wks = error_sheets.worksheet_by_title(config['google']['error_file_sheet'])
 
-# Update view statistics
-update_view_statistics(wks, 2400)
+while True:
+    # Update view statistics
+    update_view_statistics(wks, 2400)
 
-# Download new articles
-download_new_articles(wks, error_wks)
+    # Download new articles
+    download_new_articles(wks, error_wks)
