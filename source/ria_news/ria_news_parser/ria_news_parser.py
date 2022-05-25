@@ -59,11 +59,6 @@ class RiaArticle:
                          ).replace('" name="analytics:author"/>]', '')
 
 
-a = RiaArticle('https://ria.ru/20220524/sammit-1790441915.html')
-a.get_info()
-print(a.title + ' ' + str(a.statistics))
-
-
 def update_view_statistics(_wks, _period):
 
     n = 0
