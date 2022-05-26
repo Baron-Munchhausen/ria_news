@@ -51,15 +51,8 @@ class RiaArticle:
         self.created_at = soup.find_all('div', attrs={'class': 'article__info-date'})[0].find_all('a')[0].next
         self.created_at_datetime = datetime.datetime.strptime(self.created_at, '%H:%M %d.%m.%Y')
 
-        self.title = str(soup.find_all(['div', 'h1'], attrs={'class': 'article__title'})[0]
-                         ).replace('<div class="article__title">', ''
-                         ).replace('<h1 class="article__title">', ''
-                         ).replace('</div>', ''
-                         ).replace('</h1>', '')
-
-        self.author = str(soup.find_all('meta', attrs={'name': 'analytics:author'})
-                         ).replace('[<meta content="',''
-                         ).replace('" name="analytics:author"/>]', '')
+        self.title = soup.find('h1', class_='article__title').text
+        self.author = soup.find('div', class_='article__author-name').text
 
 
 def update_view_statistics(_wks, _period):
