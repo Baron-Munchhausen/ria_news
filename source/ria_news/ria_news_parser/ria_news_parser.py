@@ -24,13 +24,15 @@ class RiaArticle:
             response.html.render(timeout=10)
             article_soup = BeautifulSoup(response.html.html, 'lxml')
             result = article_soup.find_all('div', attrs={'class': 'article__info-statistic'})
-            if len(result[0].text) > 0:
+            if len(result) > 0:
                 try:
                     self.statistics = int(result[0].text)
                     session.close()
                     break
                 except ValueError:
                     continue
+            elif attempt == 2:
+                self.statistics = -1
             attempt += 1
         session.close()
 
@@ -48,15 +50,20 @@ class RiaArticle:
         self.created_at = soup.find_all('div', attrs={'class': 'article__info-date'})[0].find_all('a')[0].next
         self.created_at_datetime = datetime.datetime.strptime(self.created_at, '%H:%M %d.%m.%Y')
 
-        self.title = str(soup.find_all(['div', 'h1'], attrs={'class': 'article__title'})[0]
+        if len(soup.find_all(['div', 'h1'], attrs={'class': 'article__title'})) > 0:
+            self.title = str(soup.find_all(['div', 'h1'], attrs={'class': 'article__title'})[0]
                          ).replace('<div class="article__title">', ''
                          ).replace('<h1 class="article__title">', ''
                          ).replace('</div>', ''
                          ).replace('</h1>', '')
 
-        self.author = str(soup.find_all('meta', attrs={'name': 'analytics:author'})
+            self.author = str(soup.find_all('meta', attrs={'name': 'analytics:author'})
                          ).replace('[<meta content="',''
                          ).replace('" name="analytics:author"/>]', '')
+        elif len(soup.find_all(['h1'], attrs={'class': 'white-longread__header-title'})) > 0:
+            self.title = soup.find_all(['h1'], attrs={'class': 'white-longread__header-title'})[0].next
+            self.author = soup.find_all(['div'], attrs={'class': 'white-longread__header-author'})[0].next
+
 
 
 def update_view_statistics(_wks, _period):
@@ -89,7 +96,7 @@ def download_new_articles(_wks, _error_wks):
     n = 0
     while True:
         n += 1
-        if datetime.datetime.strptime(wks.get_value('D' + str(n)), '%H:%M %d.%m.%Y') == last_datetime:
+        if wks.get_value('D' + str(n)) != '' and datetime.datetime.strptime(wks.get_value('D' + str(n)), '%H:%M %d.%m.%Y') == last_datetime:
             last_urls.append(wks.get_value('B' + str(n)))
         else:
             break
@@ -132,8 +139,11 @@ def download_new_articles(_wks, _error_wks):
         wks.insert_rows(0, 1, [article.title, article.url, article.author, article.created_at,
                                article.statistics])
 
-
+a = RiaArticle('https://rsport.ria.ru/20220524/khokkey-1790295836.html')
+a.get_info()
+a=1
 # config
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 
