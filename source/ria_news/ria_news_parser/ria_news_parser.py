@@ -38,6 +38,8 @@ class RiaArticle:
                 attempt += 1
             except:
                 attempt += 1
+                if attempt == 2:
+                    self.statistics = -1
         session.close()
 
         if self.statistics == None:
@@ -64,10 +66,14 @@ class RiaArticle:
             self.author = str(soup.find_all('meta', attrs={'name': 'analytics:author'})
                          ).replace('[<meta content="',''
                          ).replace('" name="analytics:author"/>]', '')
+            #r = soup.find('meta', attrs={'name': 'analytics:author'})
+            #self.author = soup.find('meta', attrs={'name': 'analytics:author'}).content
         elif len(soup.find_all(['h1'], attrs={'class': 'white-longread__header-title'})) > 0:
             self.title = soup.find_all(['h1'], attrs={'class': 'white-longread__header-title'})[0].next
-            self.author = soup.find_all(['div'], attrs={'class': 'white-longread__header-author'})[0].next
-
+            if len(soup.find_all(['div'], attrs={'class': 'white-longread__header-author'})) > 0:
+                self.author = soup.find_all(['div'], attrs={'class': 'white-longread__header-author'})[0].next
+            else:
+                self.author = ''
 
 
 def update_view_statistics(_wks, _period):
@@ -143,9 +149,11 @@ def download_new_articles(_wks, _error_wks):
         wks.insert_rows(0, 1, [article.title, article.url, article.author, article.created_at,
                                article.statistics])
 
-a = RiaArticle('https://rsport.ria.ru/20220524/khokkey-1790295836.html')
-a.get_info()
-a=1
+# test for debug
+#a = RiaArticle('https://ria.ru/20220530/spetsoperatsiya-1791672081.html')
+#a.get_info()
+#a=1
+
 # config
 
 config = configparser.ConfigParser()
@@ -162,9 +170,10 @@ wks = sheets.worksheet_by_title(config['google']['article_file_sheet'])
 error_sheets = client.open_by_url(config['google']['error_file'])
 error_wks = error_sheets.worksheet_by_title(config['google']['error_file_sheet'])
 
-while True:
+# здесб будет цикл
+#while True:
     # Update view statistics
-    update_view_statistics(wks, 2400)
+update_view_statistics(wks, 1)
 
     # Download new articles
-    download_new_articles(wks, error_wks)
+download_new_articles(wks, error_wks)
