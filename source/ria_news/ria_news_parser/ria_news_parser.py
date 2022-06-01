@@ -1,5 +1,6 @@
 import requests
 import datetime
+import time
 from bs4 import BeautifulSoup
 import pygsheets  # https://github.com/nithinmurali/pygsheets
 import configparser
@@ -171,9 +172,19 @@ error_sheets = client.open_by_url(config['google']['error_file'])
 error_wks = error_sheets.worksheet_by_title(config['google']['error_file_sheet'])
 
 # здесб будет цикл
-#while True:
+while True:
+    # download starts at 01:00
+    start_at = 3600
+    start_at = 51600
+    time_passed = datetime.datetime.now().hour * 60 * 60 + datetime.datetime.now().minute * 60 + datetime.datetime.now().second
+    if time_passed < start_at:
+        sleep_seconds = start_at - time_passed
+    else:
+        sleep_seconds = 86400 - (datetime.datetime.now().hour * 60 * 60 + datetime.datetime.now().minute * 60 + datetime.datetime.now().second) + start_at
+    time.sleep(sleep_seconds)
+
     # Update view statistics
-update_view_statistics(wks, 1)
+    update_view_statistics(wks, 600)
 
     # Download new articles
-download_new_articles(wks, error_wks)
+    download_new_articles(wks, error_wks)
