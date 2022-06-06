@@ -175,7 +175,7 @@ error_wks = error_sheets.worksheet_by_title(config['google']['error_file_sheet']
 while True:
     # download starts at 01:00
     start_at = 3600
-    start_at = 51600
+    start_at = 46800
     time_passed = datetime.datetime.now().hour * 60 * 60 + datetime.datetime.now().minute * 60 + datetime.datetime.now().second
     if time_passed < start_at:
         sleep_seconds = start_at - time_passed
